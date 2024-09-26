@@ -1,6 +1,5 @@
 name: Build and Push Docker Image to ECR
 
-# Define the event that triggers the workflow
 # In this case, it runs whenever code is pushed to the 'main' branch
 on:
   push:
