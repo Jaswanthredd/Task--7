@@ -33,6 +33,7 @@ jobs:
       # Step 3: Build the Docker image from the Dockerfile in the repository
       - name: Build Docker image
         run: |
+          cd my-medusa-app  # Change directory to 'my-medusa-app'
           # Build the Docker image and tag it with the repository name from secrets
           docker build -t ${{ secrets.ECR_REPOSITORY }} .
 
