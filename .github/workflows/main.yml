@@ -42,6 +42,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
+      - name: Change Directory to Medusa App
+        run: cd my-medusa-app  # Update this path to your actual app directory
+
       - name: Build Docker Image
         id: build_image
         run: |
