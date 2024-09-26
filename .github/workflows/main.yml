@@ -3,75 +3,55 @@ name: Build and Push Docker Image to ECR
 on:
   push:
     branches:
-      - main  # Change to 'master' if that's your primary branch
+      - main
 
 jobs:
-  build:
+  build-and-push:
+    name: Build and Push Docker image to Amazon ECR
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
+      # Step 2: Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          registry-type: private
-          skip-logout: false
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Debug AWS Credentials
-        run: |
-          echo "AWS_REGION: ${{ secrets.AWS_REGION }}"
-          echo "AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-
+      # Step 3: Create ECR repository
       - name: Create ECR Repository
-        id: create_ecr
         run: |
-          aws ecr create-repository --repository-name jaswanth-medusa --region ${{ secrets.AWS_REGION }} || echo "ECR repository already exists"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          REPO_NAME=${{ secrets.ECR_REPOSITORY }}  # The repository name from secrets
+          aws ecr create-repository --repository-name $REPO_NAME --region ${{ secrets.AWS_REGION }} || echo "Repository already exists"
 
-      - name: Change Directory to Medusa App
-        run: cd my-medusa-app  # Update this path to your actual app directory
-
-      - name: Build Docker Image
-        id: build_image
+      # Step 4: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
         run: |
-          IMAGE_NAME=jaswanth-medusa  # Updated image name
-          TAG=$(date +%Y%m%d%H%M%S)
-          echo "Building Docker image with TAG: $TAG"  # Debug output
-          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$TAG .
-          echo "TAG=$TAG" >> $GITHUB_ENV  # Set TAG as an environment variable for later steps
-          echo "Images available after build:"
-          docker images  # Debug output to list images
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
-      - name: Push Docker Image to ECR
+      # Step 5: Build Docker image
+      - name: Build Docker image
         run: |
-          IMAGE_NAME=jaswanth-medusa  # Updated image name
-          TAG=${{ env.TAG }}  # Use the TAG set in the previous step
-          ECR_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$IMAGE_NAME
-          echo "Pushing to ECR URI: $ECR_URI"  # Debug output
-          echo "Pushing image with TAG: $TAG"  # Debug output
-          # Tag and push the Docker image to ECR
-          docker tag $IMAGE_NAME:latest $ECR_URI:latest
-          docker tag $IMAGE_NAME:$TAG $ECR_URI:$TAG
-          echo "Images available before push:"
-          docker images  # Debug output to list images before pushing
-          docker push $ECR_URI:latest
-          docker push $ECR_URI:$TAG
+          cd my-medusa-app  # Change directory to 'my-medusa-app'
+          docker build -t ${{ secrets.ECR_REPOSITORY }} .
 
-      - name: Logout from ECR
+      # Step 6: Tag Docker image
+      - name: Tag Docker image
         run: |
-          echo "Logging out from ECR"  # Debug output
-          docker logout
+          docker tag ${{ secrets.ECR_REPOSITORY }}:latest ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 7: Push Docker image to ECR
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 8: Cleanup local images
+      - name: Cleanup local images
+        run: |
+          docker rmi ${{ secrets.ECR_REPOSITORY }}:latest
+          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
