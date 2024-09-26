@@ -1,0 +1,49 @@
+name: Build and Push Docker Image to ECR
+
+# Define the event that triggers the workflow
+# In this case, it runs whenever code is pushed to the 'main' branch
+on:
+  push:
+    branches:
+      - main  # Workflow triggers on push to the main branch
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker image to Amazon ECR
+    runs-on: ubuntu-latest  # Use the latest version of Ubuntu runner provided by GitHub
+
+    steps:
+      # Step 1: Checkout the repository to access the code
+      - name: Checkout repository
+        uses: actions/checkout@v3  # This action checks out your repository code onto the GitHub runner
+
+      # Step 2: Authenticate and log in to Amazon ECR using AWS CLI
+      - name: Log in to Amazon ECR
+        run: |
+          # Use AWS CLI to log in to the ECR by fetching the login password and passing it to Docker
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      # Step 3: Build the Docker image from the Dockerfile in the repository
+      - name: Build Docker image
+        run: |
+          # Build the Docker image and tag it with the repository name from secrets
+          docker build -t ${{ secrets.ECR_REPOSITORY }} .
+
+      # Step 4: Tag the Docker image for the ECR repository
+      - name: Tag Docker image
+        run: |
+          # Tag the built image with the ECR registry and repository name, using the 'latest' tag
+          docker tag ${{ secrets.ECR_REPOSITORY }}:latest ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 5: Push the Docker image to Amazon ECR
+      - name: Push Docker image to ECR
+        run: |
+          # Push the tagged image to the ECR repository
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 6: Clean up Docker images from the runner to save space
+      - name: Cleanup local images
+        run: |
+          # Remove the local Docker images to free up disk space on the GitHub runner
+          docker rmi ${{ secrets.ECR_REPOSITORY }}:latest
+          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
