@@ -13,9 +13,16 @@ jobs:
     runs-on: ubuntu-latest  # Use the latest version of Ubuntu runner provided by GitHub
 
     steps:
-      # Step 1: Checkout the repository to access the code
+      # Step 1: Checkout the repository to access the code and login into aws
       - name: Checkout repository
         uses: actions/checkout@v3  # This action checks out your repository code onto the GitHub runner
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
 
       # Step 2: Authenticate and log in to Amazon ECR using AWS CLI
       - name: Log in to Amazon ECR
